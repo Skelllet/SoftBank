@@ -1,0 +1,876 @@
+openapi: 3.0.1
+info:
+  title: User-Service API
+  description: API for managing employees and blacklist operations
+  version: 1.0.0
+
+servers:
+  - url: http://172.17.1.110:31113/api/v1/abs/user-service/
+
+paths:
+  /register:
+    post:
+      summary: Регистрация нового сотрудника
+      description: Сохранение данных нового сотрудника в системе. Доступен только для администратора и суперадмина.
+      tags:
+      - Employees
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                personalInformation:
+                  type: object
+                  properties:
+                    firstName:
+                      type: string
+                      description: Имя сотрудника
+                      minLength: 1
+                      maxLength: 50
+                    lastName:
+                      type: string
+                      description: Фамилия сотрудника
+                      minLength: 1
+                      maxLength: 50
+                    middleName:
+                      type: string
+                      description: Отчество сотрудника
+                      nullable: true
+                    corporateEmail:
+                      type: string
+                      format: email
+                      description: Корпоративная электронная почта
+                      maxLength: 254
+                    birthDate:
+                      type: string
+                      format: date
+                      description: Дата рождения
+                    phone:
+                      type: string
+                      description: Номер телефона
+                      pattern: '^9[0-9]{2} [0-9]{3} [0-9]{4}$'
+                employmentInformation:
+                  type: object
+                  properties:
+                    officeNumber:
+                      type: integer
+                      description: Номер офиса
+                      minimum: 1
+                      maximum: 2147483647
+                    position:
+                      type: string
+                      enum: [Бухгалтер, Оператор, Экономист, Руководитель отдела]
+                      description: Должность
+                    accessRightId:
+                      type: integer
+                      description: Идентификатор роли сотрудника
+                    startDate:
+                      type: string
+                      format: date
+                      description: Дата начала работы
+                    endDate:
+                      type: string
+                      format: date
+                      description: Дата окончания работы
+                      nullable: true
+                passportInformation:
+                  type: object
+                  properties:
+                    citizenship:
+                      type: string
+                      description: Гражданство
+                      minLength: 2
+                      maxLength: 50
+                    issuanceDate:
+                      type: string
+                      format: date
+                      description: Дата выдачи паспорта
+                    issuedBy:
+                      type: string
+                      description: Кем выдан паспорт
+                      minLength: 1
+                      maxLength: 50
+                    departmentCode:
+                      type: string
+                      description: Код подразделения
+                      pattern: '^[0-9]{3}-[0-9]{3}$'
+                    passportNumber:
+                      type: integer
+                      description: Серия и номер паспорта
+                    registrationPlace:
+                      type: string
+                      description: Место регистрации
+                      minLength: 2
+                      maxLength: 50
+                
+              required:
+                - personalInformation
+                - employee
+      responses:
+        '201':
+          description: Успешная регистрация
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '401':
+          description: Неавторизованный доступ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "User is not authorized"
+        '403':
+          description: Запрещено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Insufficient permissions to perform the request"
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "The employee is already registered in the system"
+        '423':
+          description: Заблокировано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Employee in black list"
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+  /employees:
+    get:
+      summary: Отображение списка сотрудников
+      tags:
+        - Employees
+      parameters:
+        - name: sort
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Field to sort by
+        - name: page
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Page number to display
+        - name: size
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Number of records per page
+        - name: last_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Employee's last name
+        - name: first_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Employee's first name
+        - name: middle_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Employee's middle name
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: City
+        - name: position
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Position
+        - name: office_number
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Office number
+      responses:
+        '200':
+          description: A list of employees
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  employees:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastName:
+                          type: string
+                        firstName:
+                          type: string
+                        middleName:
+                          type: string
+                        city:
+                          type: string
+                        position:
+                          type: string
+                        officeNumber:
+                          type: integer
+        '204':
+          description: No Content
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Not found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Internal Server Error"
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+
+  /employees/{employee_id}:
+    get:
+      summary: Просмотр карточки сотрудника банка
+      tags:
+        - Employees
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Employee ID
+      responses:
+        '200':
+          description: Employee details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  employmentInformation:
+                    type: object
+                    properties:
+                      officeNumber:
+                        type: integer
+                      position:
+                        type: string
+                      startDate:
+                        type: string
+                        format: date
+                      endDate:
+                        type: string
+                        format: date
+                  personalInformation:
+                    type: object
+                    properties:
+                      lastName:
+                        type: string
+                      firstName:
+                        type: string
+                      middleName:
+                        type: string
+                      birthDate:
+                        type: string
+                        format: date
+                      email:
+                        type: string
+                      phone:
+                        type: string
+                  passportInformation:
+                    type: object
+                    properties:
+                      passportNumber:
+                        type: string
+                      issuance:
+                        type: string
+                        format: date
+                      issuedBy:
+                        type: string
+                      departmentCode:
+                        type: string
+                      citizenship:
+                        type: string
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '401':
+          description: Неавторизованный доступ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "User is not authorized"
+      
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Not found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Internal Server Error"
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+
+    patch:
+      summary: Редактирование информации о сотруднике
+      description: Доступен только для администратора и суперадмина.
+      tags:
+        - Employees
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Employee ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employmentInformation:
+                  type: object
+                  properties:
+                    officeNumber:
+                      type: integer
+                    position:
+                      type: string
+                    role:
+                      type: string
+                    startDate:
+                      type: string
+                      format: date
+                    endDate:
+                      type: string
+                      format: date
+                personalInformation:
+                  type: object
+                  properties:
+                    lastName:
+                      type: string
+                    firstName:
+                      type: string
+                    middleName:
+                      type: string
+                    birthDate:
+                      type: string
+                      format: date
+                    email:
+                      type: string
+                    phone:
+                      type: string
+                passportInformation:
+                  type: object
+                  properties:
+                    passportNumber:
+                      type: string
+                    issuanceDate:
+                      type: string
+                      format: date
+                    issuedBy:
+                      type: string
+                    departmentCode:
+                      type: string
+                    citizenship:
+                      type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '401':
+          description: Неавторизованный доступ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "User is not authorized"
+      
+        '403':
+          description: Запрещено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Insufficient permissions to perform the request"
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+    delete:
+      summary: Удаление профиля сотрудника
+      tags:
+        - Employees
+      description: Удаляет информацию о сотруднике из системы. Доступен только для администратора и суперадмина.
+      operationId: deleteEmployee
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          description: Уникальный идентификатор сотрудника, информацию о котором необходимо удалить.
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No content.
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '401':
+          description: Неавторизованный доступ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "User is not authorized"
+        '403':
+          description: Запрещено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Insufficient permissions to perform the request"
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Not found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Internal Server Error"
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+
+  /employees/{employee_id}/blacklist:
+    post:
+      summary: Добавление сотрудника в черный список
+      description: Доступен только для администратора и суперадмина.
+      tags:
+        - Employees
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Employee ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Успешно добавлен
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '401':
+          description: Неавторизованный доступ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "User is not authorized"
+        '403':
+          description: Запрещено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Insufficient permissions to perform the request"
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "The employee is already registered in the system"
+        
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+
+    delete:
+      summary: Удаление сотрудника из черного списка
+      description: Доступен только для администратора и суперадмина.
+      tags:
+        - Employees
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Employee ID
+      responses:
+        '204':
+          description: Успешно удален
+        '400':
+          description: Неверный параметр
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Invalid parameter value {parameter_name}"
+        '401':
+          description: Неавторизованный доступ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "User is not authorized"
+        '403':
+          description: Запрещено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Insufficient permissions to perform the request"
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Not found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Internal Server Error"
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Server is temporarily unavailable"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []  
